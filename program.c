@@ -93,25 +93,52 @@ void print_hexdump(FILE *fp, FILE *out) {
 }
 
 int main(int argc, char *argv[]) {
-    if (argc != 3) {
-        fprintf(stderr, "Usage: %s -t|-s|-v <file>\n", argv[0]);
+    int mode = 0; // 1=text, 2=save, 3=visualize
+    long offset = 0;
+    char *filename = NULL;
+
+    // Parse arguments
+    for (int i = 1; i < argc; ++i) {
+        if (strcmp(argv[i], "-t") == 0) mode = 1;
+        else if (strcmp(argv[i], "-s") == 0) mode = 2;
+        else if (strcmp(argv[i], "-v") == 0) mode = 3;
+        else if (strcmp(argv[i], "-o") == 0 && i + 1 < argc) {
+            offset = strtol(argv[++i], NULL, 0);
+        } else if (argv[i][0] != '-') {
+            filename = argv[i];
+        }
+    }
+
+    if (!filename || mode == 0) {
+        fprintf(stderr, "Usage: %s -t|-s|-v [-o offset] <file>\n", argv[0]);
         fprintf(stderr, "  -t : print hexdump to terminal\n");
         fprintf(stderr, "  -s : save hexdump to file.txt\n");
         fprintf(stderr, "  -v : visualize file as hexdump.ppm\n");
+        fprintf(stderr, "  -o offset : start at byte offset\n");
         return 1;
     }
-    if (strcmp(argv[1], "-v") == 0) {
-        visualize_file(argv[2]);
+
+    if (mode == 3) {
+        // Visualization mode does not support offset for now
+        visualize_file(filename);
         return 0;
     }
-    FILE *fp = fopen(argv[2], "rb");
+
+    FILE *fp = fopen(filename, "rb");
     if (!fp) {
         perror("fopen");
         return 1;
     }
-    if (strcmp(argv[1], "-t") == 0) {
+    if (offset > 0) {
+        if (fseek(fp, offset, SEEK_SET) != 0) {
+            perror("fseek");
+            fclose(fp);
+            return 1;
+        }
+    }
+    if (mode == 1) {
         print_hexdump(fp, stdout);
-    } else if (strcmp(argv[1], "-s") == 0) {
+    } else if (mode == 2) {
         FILE *out = fopen("hexdump.txt", "w");
         if (!out) {
             perror("fopen output");
@@ -121,10 +148,6 @@ int main(int argc, char *argv[]) {
         print_hexdump(fp, out);
         fclose(out);
         printf("Hexdump saved to hexdump.txt\n");
-    } else {
-        fprintf(stderr, "Unknown option: %s\n", argv[1]);
-        fclose(fp);
-        return 1;
     }
     fclose(fp);
     return 0;
