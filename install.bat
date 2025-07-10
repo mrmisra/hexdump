@@ -3,7 +3,7 @@ REM install.bat - Installs hexdump.exe from the latest GitHub release
 
 REM 1. Set variables
 setlocal
-set REPO=OWNER/REPO_NAME
+set REPO=mrmisra/hexdump-win
 set EXE=hexdump.exe
 set INSTALLDIR=%ProgramFiles%\hexdump
 set TMPDIR=%TEMP%\hexdump_download
