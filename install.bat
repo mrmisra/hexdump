@@ -29,14 +29,20 @@ if not exist "%TMPDIR%\%EXE%" (
 REM 4. Move exe to install dir
 move /Y "%TMPDIR%\%EXE%" "%INSTALLDIR%\%EXE%"
 
-REM 5. Add to system PATH (requires admin)
+REM 5. Create hd.bat wrapper
+(
+    echo @echo off
+    echo hexdump.exe %%*
+) > "%INSTALLDIR%\hd.bat"
+
+REM 6. Add to system PATH (requires admin)
 setx /M PATH "%PATH%;%INSTALLDIR%"
 
-REM 6. Cleanup
+REM 7. Cleanup
 del /Q "%TMPDIR%\%EXE%"
 rmdir "%TMPDIR%"
 
-REM 7. Done
-echo Installed hexdump.exe to %INSTALLDIR% and added to PATH.
+REM 8. Done
+echo Installed hexdump.exe and hd.bat to %INSTALLDIR% and added to PATH.
 endlocal
 pause
