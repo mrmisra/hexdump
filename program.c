@@ -70,12 +70,14 @@ void visualize_file(const char *filename) {
 
 #define BYTES_PER_LINE 16
 
-void print_hexdump(FILE *fp, FILE *out) {
+void print_hexdump(FILE *fp, FILE *out, long max_bytes) {
     unsigned char buffer[BYTES_PER_LINE];
     size_t offset = 0;
     size_t n;
+    long bytes_left = max_bytes > 0 ? max_bytes : -1;
 
     while ((n = fread(buffer, 1, BYTES_PER_LINE, fp)) > 0) {
+        if (bytes_left >= 0 && n > (size_t)bytes_left) n = (size_t)bytes_left;
         fprintf(out, "%08zx  ", offset);
         for (size_t i = 0; i < BYTES_PER_LINE; ++i) {
             if (i < n)
@@ -89,12 +91,17 @@ void print_hexdump(FILE *fp, FILE *out) {
             fprintf(out, "%c", isprint(buffer[i]) ? buffer[i] : '.');
         fprintf(out, "|\n");
         offset += n;
+        if (bytes_left >= 0) {
+            bytes_left -= n;
+            if (bytes_left <= 0) break;
+        }
     }
 }
 
 int main(int argc, char *argv[]) {
     int mode = 0; // 1=text, 2=save, 3=visualize
     long offset = 0;
+    long max_bytes = -1;
     char *filename = NULL;
 
     // Parse arguments
@@ -104,22 +111,25 @@ int main(int argc, char *argv[]) {
         else if (strcmp(argv[i], "-v") == 0) mode = 3;
         else if (strcmp(argv[i], "-o") == 0 && i + 1 < argc) {
             offset = strtol(argv[++i], NULL, 0);
+        } else if (strcmp(argv[i], "-n") == 0 && i + 1 < argc) {
+            max_bytes = strtol(argv[++i], NULL, 0);
         } else if (argv[i][0] != '-') {
             filename = argv[i];
         }
     }
 
     if (!filename || mode == 0) {
-        fprintf(stderr, "Usage: %s -t|-s|-v [-o offset] <file>\n", argv[0]);
+        fprintf(stderr, "Usage: %s -t|-s|-v [-o offset] [-n num] <file>\n", argv[0]);
         fprintf(stderr, "  -t : print hexdump to terminal\n");
         fprintf(stderr, "  -s : save hexdump to file.txt\n");
         fprintf(stderr, "  -v : visualize file as hexdump.ppm\n");
         fprintf(stderr, "  -o offset : start at byte offset\n");
+        fprintf(stderr, "  -n num : read only first num bytes\n");
         return 1;
     }
 
     if (mode == 3) {
-        // Visualization mode does not support offset for now
+        // Visualization mode does not support offset or max_bytes for now
         visualize_file(filename);
         return 0;
     }
@@ -137,7 +147,7 @@ int main(int argc, char *argv[]) {
         }
     }
     if (mode == 1) {
-        print_hexdump(fp, stdout);
+        print_hexdump(fp, stdout, max_bytes);
     } else if (mode == 2) {
         FILE *out = fopen("hexdump.txt", "w");
         if (!out) {
@@ -145,7 +155,7 @@ int main(int argc, char *argv[]) {
             fclose(fp);
             return 1;
         }
-        print_hexdump(fp, out);
+        print_hexdump(fp, out, max_bytes);
         fclose(out);
         printf("Hexdump saved to hexdump.txt\n");
     }
