@@ -13,6 +13,8 @@ A simple hexdump utility for Windows, written in C and compatible with Clang. It
 
 ## Usage
 
+You can write `hexdump` or just `hd` rather then the full `hexdump.exe` in terminal after installation and it'll work fine.
+
 ```
 hexdump.exe -t [-o offset] [-n num] file.bin      # Print hexdump to terminal
 hexdump.exe -s [-o offset] [-n num] file.bin      # Save hexdump to hexdump.txt
@@ -26,7 +28,7 @@ hexdump.exe -v file.bin                          # Visualize file as hexdump.ppm
 
 ### Automatic (Recommended)
 1. Download `install.bat` from the [latest GitHub release](https://github.com/OWNER/REPO_NAME/releases/latest).
-2. Run `install.bat` as administrator.
+2. Run `install.bat` as **administrator**.
    - The script will:
      - Download the latest `hexdump.exe` from GitHub
      - Create `C:\Program Files\hexdump`
