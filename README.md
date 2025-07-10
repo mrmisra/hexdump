@@ -25,7 +25,7 @@ hexdump.exe -v file.bin                          # Visualize file as hexdump.ppm
 ## Installation
 
 ### Automatic (Recommended)
-1. Download `install.bat` from the [latest GitHub release](https://github.com/OWNER/REPO_NAME/releases/latest) (replace OWNER/REPO_NAME with your repo).
+1. Download `install.bat` from the [latest GitHub release](https://github.com/OWNER/REPO_NAME/releases/latest).
 2. Run `install.bat` as administrator.
    - The script will:
      - Download the latest `hexdump.exe` from GitHub
