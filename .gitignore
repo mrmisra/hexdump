@@ -3,3 +3,6 @@ hexdump.ppm
 hexdump.exe
 
 .vscode
+
+build.bat
+prod.bat
