@@ -27,9 +27,18 @@ hexdump.exe -v file.bin                          # Visualize file as hexdump.ppm
 - `-o <offset>`: Start at byte offset (e.g., `-o 512`)
 - `-n <num>`: Read only first N bytes (e.g., `-n 256`)
 
+
 ## Installation
 
-### Windows (Automatic)
+### Windows (Recommended: Scoop)
+If you use [Scoop](https://scoop.sh/), you can install directly from my bucket:
+
+```
+scoop bucket add mrmisra https://github.com/mrmisra/scoop-bucket
+scoop install hexdump
+```
+
+### Windows (Script)
 1. Download `install.bat` from the [latest GitHub release](https://github.com/mrmisra/hexdump/releases/latest).
 2. Run `install.bat` as **administrator**.
    - The script will:
