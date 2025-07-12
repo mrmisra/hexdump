@@ -6,22 +6,30 @@
 
 #define MAX_FILE_SIZE (1024 * 1024 * 10) // 10 MB limit for visualization
 
-// Map a byte to an RGB color (simple scheme)
-void byte_to_rgb(unsigned char byte, unsigned char *r, unsigned char *g, unsigned char *b) {
-    if (byte == 0x00) { // Null
-        *r = 0; *g = 0; *b = 0;
-    } else if (isprint(byte)) { // Printable ASCII
-        *r = 0; *g = 200; *b = 0;
-    } else if (isspace(byte)) { // Whitespace
-        *r = 200; *g = 200; *b = 200;
-    } else if (byte < 0x20 || byte == 0x7F) { // Control
-        *r = 200; *g = 0; *b = 0;
-    } else { // Other
-        *r = 0; *g = 0; *b = 200;
+
+// Fast byte categorization using bitmasks
+#define is_printable_ascii(b) ((b) >= 0x20 && (b) <= 0x7E)
+#define is_whitespace(b) ((b) == ' ' || ((b) >= '\t' && (b) <= '\r'))
+
+// Precomputed RGB LUT for visualization
+static void build_rgb_table(unsigned char rgb_table[256][3]) {
+    for (int i = 0; i < 256; i++) {
+        if (i == 0x00) { // Null
+            rgb_table[i][0] = 0; rgb_table[i][1] = 0; rgb_table[i][2] = 0;
+        } else if (is_printable_ascii(i)) { // Printable ASCII
+            rgb_table[i][0] = 0; rgb_table[i][1] = 200; rgb_table[i][2] = 0;
+        } else if (is_whitespace(i)) { // Whitespace
+            rgb_table[i][0] = 200; rgb_table[i][1] = 200; rgb_table[i][2] = 200;
+        } else if (i < 0x20 || i == 0x7F) { // Control
+            rgb_table[i][0] = 200; rgb_table[i][1] = 0; rgb_table[i][2] = 0;
+        } else { // Other
+            rgb_table[i][0] = 0; rgb_table[i][1] = 0; rgb_table[i][2] = 200;
+        }
     }
 }
 
-// Visualize file as a PPM image (Binvis-style)
+
+// Visualize file as a PPM image (Binvis-style, optimized)
 void visualize_file(const char *filename) {
     FILE *fp = fopen(filename, "rb");
     if (!fp) {
@@ -41,7 +49,6 @@ void visualize_file(const char *filename) {
         free(data);
         return;
     }
-    // Image dimensions: width = 256, height = ceil(size/256)
     int width = 256;
     int height = (int)((size + width - 1) / width);
     FILE *img = fopen("hexdump.ppm", "wb");
@@ -51,49 +58,61 @@ void visualize_file(const char *filename) {
         return;
     }
     fprintf(img, "P6\n%d %d\n255\n", width, height);
+    unsigned char rgb_table[256][3];
+    build_rgb_table(rgb_table);
+    unsigned char *row = malloc(3 * width);
+    if (!row) {
+        fprintf(stderr, "Row memory allocation failed\n");
+        fclose(img);
+        free(data);
+        return;
+    }
     for (int y = 0; y < height; ++y) {
         for (int x = 0; x < width; ++x) {
             size_t idx = y * width + x;
-            unsigned char r = 255, g = 255, b = 255;
-            if (idx < size) {
-                byte_to_rgb(data[idx], &r, &g, &b);
-            }
-            fwrite(&r, 1, 1, img);
-            fwrite(&g, 1, 1, img);
-            fwrite(&b, 1, 1, img);
+            if (idx < size) memcpy(&row[3*x], rgb_table[data[idx]], 3);
+            else memset(&row[3*x], 255, 3); // White
         }
+        fwrite(row, 3, width, img); // Single write per row
     }
+    free(row);
     fclose(img);
     free(data);
     printf("Visualization saved to hexdump.ppm\n");
 }
 
+
 #define BYTES_PER_LINE 16
+#define BLOCK_SIZE 4096
 
+// Optimized hexdump: block processing
 void print_hexdump(FILE *fp, FILE *out, long max_bytes) {
-    unsigned char buffer[BYTES_PER_LINE];
+    unsigned char block[BLOCK_SIZE];
     size_t offset = 0;
-    size_t n;
     long bytes_left = max_bytes > 0 ? max_bytes : -1;
-
-    while ((n = fread(buffer, 1, BYTES_PER_LINE, fp)) > 0) {
-        if (bytes_left >= 0 && n > (size_t)bytes_left) n = (size_t)bytes_left;
-        fprintf(out, "%08zx  ", offset);
-        for (size_t i = 0; i < BYTES_PER_LINE; ++i) {
-            if (i < n)
-                fprintf(out, "%02x ", buffer[i]);
-            else
-                fprintf(out, "   ");
-            if (i == 7) fprintf(out, " ");
-        }
-        fprintf(out, " |");
-        for (size_t i = 0; i < n; ++i)
-            fprintf(out, "%c", isprint(buffer[i]) ? buffer[i] : '.');
-        fprintf(out, "|\n");
-        offset += n;
-        if (bytes_left >= 0) {
-            bytes_left -= n;
-            if (bytes_left <= 0) break;
+    size_t n;
+    while ((n = fread(block, 1, (bytes_left < 0 || bytes_left > BLOCK_SIZE) ? BLOCK_SIZE : bytes_left, fp)) > 0) {
+        size_t processed = 0;
+        while (processed < n) {
+            size_t line_len = (n - processed > BYTES_PER_LINE) ? BYTES_PER_LINE : (n - processed);
+            fprintf(out, "%08zx  ", offset);
+            for (size_t i = 0; i < BYTES_PER_LINE; ++i) {
+                if (i < line_len)
+                    fprintf(out, "%02x ", block[processed + i]);
+                else
+                    fprintf(out, "   ");
+                if (i == 7) fprintf(out, " ");
+            }
+            fprintf(out, " |");
+            for (size_t i = 0; i < line_len; ++i)
+                fprintf(out, "%c", is_printable_ascii(block[processed + i]) ? block[processed + i] : '.');
+            fprintf(out, "|\n");
+            offset += line_len;
+            processed += line_len;
+            if (bytes_left >= 0) {
+                bytes_left -= line_len;
+                if (bytes_left <= 0) return;
+            }
         }
     }
 }
