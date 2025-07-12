@@ -1,7 +1,8 @@
 
-# Hexdump for Windows
 
-A simple hexdump utility for Windows, written in C and compatible with Clang. It can print, save, or visualize the contents of binary files, and is easy to install with a batch script.
+# Hexdump
+
+A simple, cross-platform hexdump utility written in C. It can print, save, or visualize the contents of binary files, and is easy to install on both Windows and Linux using the provided install scripts and prebuilt binaries.
 
 ## Features
 - Print hexdump to terminal (`-t`)
@@ -9,11 +10,13 @@ A simple hexdump utility for Windows, written in C and compatible with Clang. It
 - Visualize file as a color-coded image (`-v`, outputs PPM format)
 - Start reading from a specific byte offset (`-o <offset>`)
 - Limit output to the first N bytes (`-n <num>`)
-- Easy installation via `install.bat` (downloads latest release and sets up PATH)
+- Cross-platform: works on Windows and Linux
+- Easy installation via `install.bat` (Windows) or `install.sh` (Linux)
 
 ## Usage
 
-You can write `hexdump` or just `hd` rather then the full `hexdump.exe` in terminal after installation and it'll work fine.
+
+After installation, you can use `hexdump` or `hd` (on Windows) or just `hd` (on Linux) from any terminal.
 
 ```
 hexdump.exe -t [-o offset] [-n num] file.bin      # Print hexdump to terminal
