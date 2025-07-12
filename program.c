@@ -98,11 +98,23 @@ void print_hexdump(FILE *fp, FILE *out, long max_bytes) {
     }
 }
 
+
+void print_help(const char *prog) {
+    printf("Usage: %s -t|-s|-v [-o offset] [-n num] <file>\n", prog);
+    printf("  -t         : print hexdump to terminal\n");
+    printf("  -s         : save hexdump to file.txt\n");
+    printf("  -v         : visualize file as hexdump.ppm\n");
+    printf("  -o offset  : start at byte offset\n");
+    printf("  -n num     : read only first num bytes\n");
+    printf("  -h, --help : show this help message\n");
+}
+
 int main(int argc, char *argv[]) {
     int mode = 0; // 1=text, 2=save, 3=visualize
     long offset = 0;
     long max_bytes = -1;
     char *filename = NULL;
+    int show_help = 0;
 
     // Parse arguments
     for (int i = 1; i < argc; ++i) {
@@ -113,18 +125,20 @@ int main(int argc, char *argv[]) {
             offset = strtol(argv[++i], NULL, 0);
         } else if (strcmp(argv[i], "-n") == 0 && i + 1 < argc) {
             max_bytes = strtol(argv[++i], NULL, 0);
+        } else if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
+            show_help = 1;
         } else if (argv[i][0] != '-') {
             filename = argv[i];
         }
     }
 
+    if (show_help) {
+        print_help(argv[0]);
+        return 0;
+    }
+
     if (!filename || mode == 0) {
-        fprintf(stderr, "Usage: %s -t|-s|-v [-o offset] [-n num] <file>\n", argv[0]);
-        fprintf(stderr, "  -t : print hexdump to terminal\n");
-        fprintf(stderr, "  -s : save hexdump to file.txt\n");
-        fprintf(stderr, "  -v : visualize file as hexdump.ppm\n");
-        fprintf(stderr, "  -o offset : start at byte offset\n");
-        fprintf(stderr, "  -n num : read only first num bytes\n");
+        print_help(argv[0]);
         return 1;
     }
 
