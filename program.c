@@ -5,33 +5,32 @@
 #include <string.h>
 #include <sys/stat.h>
 
-#define MAX_FILE_SIZE (1024 * 1024 * 10) // 10 MB limit for visualization
+#define MAX_FILE_SIZE (1024 * 1024 * 10) // 10 MB max for image mode
 
 
-// Fast byte categorization using bitmasks
 #define is_printable_ascii(b) ((b) >= 0x20 && (b) <= 0x7E)
 #define is_whitespace(b) ((b) == ' ' || ((b) >= '\t' && (b) <= '\r'))
 
-// Precomputed RGB LUT for visualization
+// Fill a 256-entry RGB lookup table for byte visualization
 static void build_rgb_table(unsigned char rgb_table[256][3]) {
     for (int i = 0; i < 256; i++) {
-        if (i == 0x00) { // Null
+        if (i == 0x00) {
             rgb_table[i][0] = 0; rgb_table[i][1] = 0; rgb_table[i][2] = 0;
-        } else if (is_printable_ascii(i)) { // Printable ASCII
+        } else if (is_printable_ascii(i)) {
             rgb_table[i][0] = 0; rgb_table[i][1] = 200; rgb_table[i][2] = 0;
-        } else if (is_whitespace(i)) { // Whitespace
+        } else if (is_whitespace(i)) {
             rgb_table[i][0] = 200; rgb_table[i][1] = 200; rgb_table[i][2] = 200;
-        } else if (i < 0x20 || i == 0x7F) { // Control
+        } else if (i < 0x20 || i == 0x7F) {
             rgb_table[i][0] = 200; rgb_table[i][1] = 0; rgb_table[i][2] = 0;
-        } else { // Other
+        } else {
             rgb_table[i][0] = 0; rgb_table[i][1] = 0; rgb_table[i][2] = 200;
         }
     }
 }
 
 
-// Visualize file as a PPM image (Binvis-style, optimized)
-void visualize_file(const char *filename) {
+// Write a PPM image visualizing the file's byte structure
+void visualize_file(const char *filename, long offset, long max_bytes) {
     struct stat st;
     if (stat(filename, &st) != 0) {
         perror("stat");
@@ -41,21 +40,32 @@ void visualize_file(const char *filename) {
         fprintf(stderr, "File size invalid or too large (max %d bytes)\n", MAX_FILE_SIZE);
         return;
     }
+    if (offset < 0 || offset >= st.st_size) {
+        fprintf(stderr, "Offset out of range\n");
+        return;
+    }
+    long region = st.st_size - offset;
+    if (max_bytes > 0 && max_bytes < region) region = max_bytes;
     FILE *fp = fopen(filename, "rb");
     if (!fp) {
         perror("fopen");
         return;
     }
-    unsigned char *data = malloc(st.st_size);
+    if (fseek(fp, offset, SEEK_SET) != 0) {
+        perror("fseek");
+        fclose(fp);
+        return;
+    }
+    unsigned char *data = malloc(region);
     if (!data) {
         fprintf(stderr, "Memory allocation failed\n");
         fclose(fp);
         return;
     }
-    size_t size = fread(data, 1, st.st_size, fp);
+    size_t size = fread(data, 1, region, fp);
     fclose(fp);
-    if (size != (size_t)st.st_size) {
-        fprintf(stderr, "File read error\n");
+    if (size == 0) {
+        fprintf(stderr, "File read error or empty region\n");
         free(data);
         return;
     }
@@ -86,7 +96,7 @@ void visualize_file(const char *filename) {
         for (int x = 0; x < width; ++x) {
             size_t idx = y * width + x;
             if (idx < size) memcpy(&row[3*x], rgb_table[data[idx]], 3);
-            else memset(&row[3*x], 255, 3); // White
+            else memset(&row[3*x], 255, 3);
         }
         if (fwrite(row, 3, width, img) != width) {
             fprintf(stderr, "Image row write error\n");
@@ -100,10 +110,9 @@ void visualize_file(const char *filename) {
 }
 
 
+// Output hexdump in 16-byte lines, reading in 4KB blocks
 #define BYTES_PER_LINE 16
 #define BLOCK_SIZE 4096
-
-// Optimized hexdump: block processing
 void print_hexdump(FILE *fp, FILE *out, long max_bytes) {
     struct stat st;
     if (fstat(fileno(fp), &st) != 0) {
@@ -191,8 +200,7 @@ int main(int argc, char *argv[]) {
     }
 
     if (mode == 3) {
-        // Visualization mode does not support offset or max_bytes for now
-        visualize_file(filename);
+        visualize_file(filename, offset, max_bytes);
         return 0;
     }
 
