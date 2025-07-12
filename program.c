@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include <string.h>
+#include <sys/stat.h>
 
 #define MAX_FILE_SIZE (1024 * 1024 * 10) // 10 MB limit for visualization
 
@@ -31,21 +32,30 @@ static void build_rgb_table(unsigned char rgb_table[256][3]) {
 
 // Visualize file as a PPM image (Binvis-style, optimized)
 void visualize_file(const char *filename) {
+    struct stat st;
+    if (stat(filename, &st) != 0) {
+        perror("stat");
+        return;
+    }
+    if (st.st_size <= 0 || st.st_size > MAX_FILE_SIZE) {
+        fprintf(stderr, "File size invalid or too large (max %d bytes)\n", MAX_FILE_SIZE);
+        return;
+    }
     FILE *fp = fopen(filename, "rb");
     if (!fp) {
         perror("fopen");
         return;
     }
-    unsigned char *data = malloc(MAX_FILE_SIZE);
+    unsigned char *data = malloc(st.st_size);
     if (!data) {
         fprintf(stderr, "Memory allocation failed\n");
         fclose(fp);
         return;
     }
-    size_t size = fread(data, 1, MAX_FILE_SIZE, fp);
+    size_t size = fread(data, 1, st.st_size, fp);
     fclose(fp);
-    if (size == 0) {
-        fprintf(stderr, "File is empty or too large\n");
+    if (size != (size_t)st.st_size) {
+        fprintf(stderr, "File read error\n");
         free(data);
         return;
     }
@@ -57,7 +67,12 @@ void visualize_file(const char *filename) {
         free(data);
         return;
     }
-    fprintf(img, "P6\n%d %d\n255\n", width, height);
+    if (fprintf(img, "P6\n%d %d\n255\n", width, height) < 0) {
+        fprintf(stderr, "Image header write error\n");
+        fclose(img);
+        free(data);
+        return;
+    }
     unsigned char rgb_table[256][3];
     build_rgb_table(rgb_table);
     unsigned char *row = malloc(3 * width);
@@ -73,7 +88,10 @@ void visualize_file(const char *filename) {
             if (idx < size) memcpy(&row[3*x], rgb_table[data[idx]], 3);
             else memset(&row[3*x], 255, 3); // White
         }
-        fwrite(row, 3, width, img); // Single write per row
+        if (fwrite(row, 3, width, img) != width) {
+            fprintf(stderr, "Image row write error\n");
+            break;
+        }
     }
     free(row);
     fclose(img);
@@ -87,11 +105,22 @@ void visualize_file(const char *filename) {
 
 // Optimized hexdump: block processing
 void print_hexdump(FILE *fp, FILE *out, long max_bytes) {
+    struct stat st;
+    if (fstat(fileno(fp), &st) != 0) {
+        perror("fstat");
+        return;
+    }
+    if (st.st_size < 0) {
+        fprintf(stderr, "File size invalid\n");
+        return;
+    }
+    long file_bytes_left = st.st_size;
+    if (max_bytes > 0 && max_bytes < file_bytes_left) file_bytes_left = max_bytes;
     unsigned char block[BLOCK_SIZE];
     size_t offset = 0;
-    long bytes_left = max_bytes > 0 ? max_bytes : -1;
+    long bytes_left = file_bytes_left;
     size_t n;
-    while ((n = fread(block, 1, (bytes_left < 0 || bytes_left > BLOCK_SIZE) ? BLOCK_SIZE : bytes_left, fp)) > 0) {
+    while (bytes_left > 0 && (n = fread(block, 1, (bytes_left > BLOCK_SIZE ? BLOCK_SIZE : bytes_left), fp)) > 0) {
         size_t processed = 0;
         while (processed < n) {
             size_t line_len = (n - processed > BYTES_PER_LINE) ? BYTES_PER_LINE : (n - processed);
