@@ -89,4 +89,4 @@ scoop install hexdump
 - Open the `.ppm` file with an image viewer that supports PPM (e.g., IrfanView, GIMP, or convert to PNG).
 
 ## License
-MIT License
+GPL-v3
