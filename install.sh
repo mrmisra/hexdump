@@ -23,6 +23,7 @@ chmod +x "$TMPDIR/$BINARY"
 # Install to INSTALLDIR
 sudo cp "$TMPDIR/$BINARY" "$INSTALLDIR/$BINARY"
 
-# Clean up	rm -rf "$TMPDIR"
+# Clean up	
+rm -rf "$TMPDIR"
 
 echo "Installed $BINARY to $INSTALLDIR. You can now run 'hd' from anywhere."
